@@ -1,31 +1,38 @@
 <?php
-// Configure upload directory and allowed file types
-$uploadDir = 'uploads/';
+$uploadDir = __DIR__ . '/uploads/';
 $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
 
-// Check if a file is uploaded
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_FILES['seedImage']['name'])) {
         $fileName = basename($_FILES['seedImage']['name']);
         $filePath = $uploadDir . $fileName;
         $fileType = $_FILES['seedImage']['type'];
 
-        // Validate file type
         if (in_array($fileType, $allowedTypes)) {
-            // Move the uploaded file to the target directory
-            if (move_uploaded_file($_FILES['seedImage']['tmp_name'], $filePath)) {
-                // Call Python script for image processing
-                $pythonScript = 'python3 process_image.py';
-                $command = escapeshellcmd($pythonScript . ' ' . $filePath);
-                $output = shell_exec($command);
+            if (!is_writable($uploadDir)) {
+                die("Uploads directory is not writable.");
+            }
 
-                // Parse the output and redirect to results page
-                $result = json_decode($output, true); // Assuming JSON output from Python
-                if ($result) {
-                    header("Location: result.php?quality=" . urlencode($result['quality']) . "&defects=" . urlencode($result['defects']));
+            if (move_uploaded_file($_FILES['seedImage']['tmp_name'], $filePath)) {
+                // Call the .bat file to execute the Python script
+                $batFile = __DIR__ . '/run_project.bat';
+                $pythonScript = __DIR__ . '/process_image.py';
+                $command = escapeshellcmd("cmd /c \"$batFile $pythonScript $filePath\"");
+                $output = shell_exec($command . " 2>&1"); // Execute and capture output
+
+                // Log the output for debugging
+                file_put_contents("debug.log", $output);
+
+                // Parse JSON output
+                $result = json_decode($output, true);
+                if (isset($result['error'])) {
+                    echo "Error: " . htmlspecialchars($result['error']);
+                } elseif (isset($result['quality'])) {
+                    $quality = $result['quality'];
+                    header("Location: result.php?quality=" . urlencode($quality));
                     exit;
                 } else {
-                    echo "Error processing the image.";
+                    echo "Error processing the image. Output: $output";
                 }
             } else {
                 echo "Failed to upload the image.";

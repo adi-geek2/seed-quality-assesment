@@ -5,14 +5,17 @@ import torch
 import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image
+import warnings
 
+# Suppress warnings related to torch.load
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 # Function to load the pre-trained model
 def load_model():
     model = models.mobilenet_v3_large()
     num_classes = 2
     model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
-    model.load_state_dict(torch.load("mobilenet_weights_20241129_132949.pth", map_location=torch.device("cpu")))
+    model.load_state_dict(torch.load("mobilenet_weights_20241129_132949.pth", map_location=torch.device("cpu"), weights_only=True))
     model.eval()
     return model
 
@@ -35,7 +38,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     image_path = sys.argv[1]  # Get image path from PHP script
-
     try:
         # Preprocess the image
         input_tensor = preprocess_image(image_path)
